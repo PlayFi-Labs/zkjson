@@ -105,7 +105,7 @@ async function main() {
     // Generate the proof
     const zkp = await zkdb.genProof({
       json: fullRecord,
-      col_id: 0,
+      col_id: 'counterstrike',
       path: "gamer",
       id: "Jack",
     });
@@ -173,12 +173,12 @@ async function main() {
 
     await pauseForUserInput("Press ENTER to generate and verify the proof...");
 
-    await zkdb.insert(0, "Jack", json);
+    await zkdb.insert('counterstrike', "Jack", json);
 
     // Generate the proof
     const { proof, publicSignals } = await zkdb.genSignalProof({
       json: json,
-      col_id: 0,
+      col_id: 'counterstrike',
       path: "gamer",
       id: "Jack",
     });
@@ -250,18 +250,20 @@ async function main() {
     // Combine json with zkp to create finalJson
     const finalJson = { ...json, zkProof: proof };
 
-    // Insert finalJson into the database
-    const collection1 = zkdb.db.collection('counterstrike');
-    const insertResult = await collection1.insertOne(finalJson);
+    await zkdb.insert('counterstrike', "Jacky", finalJson);
 
-    if (insertResult.acknowledged) {
-      console.log("Storing in storage layer...");
-      console.log(chalk.green.bold(`✔ Process completed and JSON saved in Storage layer`));
-      console.log("Final JSON with proof included:", finalJson);
-    } else {
-      console.log("Error inserting into database.");
-      process.exit(1);
-    }
+    // Insert finalJson into the database
+    //const collection1 = zkdb.db.collection('counterstrike');
+    //const insertResult = await collection1.insertOne(finalJson);
+//
+    //if (insertResult.acknowledged) {
+    //  console.log("Storing in storage layer...");
+    //  console.log(chalk.green.bold(`✔ Process completed and JSON saved in Storage layer`));
+    //  console.log("Final JSON with proof included:", finalJson);
+    //} else {
+    //  console.log("Error inserting into database.");
+    //  process.exit(1);
+    //}
 
     process.exit(0);
 
@@ -316,12 +318,12 @@ async function main() {
       await pauseForUserInput("Press ENTER to regenerate and verify the proof off-chain...");
 
       //TODO: Remove this insert line
-      await zkdb.insert(0, "Jack", fullRecord);
+      await zkdb.insert('counterstrike', "Jack", fullRecord);
 
       // Regenerate the proof
       const { proof, publicSignals } = await zkdb.genSignalProof({
         json: fullRecord,
-        col_id: 0,
+        col_id: 'counterstrike',
         path: "gamer",
         id: "Jack",
       });
@@ -347,7 +349,7 @@ async function main() {
       await pauseForUserInput("Press ENTER to verify the proof on-chain...");
 
       //TODO: Remove this insert line
-      await zkdb.insert(0, "Jack", fullRecord);
+      await zkdb.insert('counterstrike', "Jack", fullRecord);
 
       const isValidOnChain = await onChainVerification(zkdb, fullRecord);
 
@@ -364,12 +366,12 @@ async function main() {
       await pauseForUserInput("Press ENTER to verify the proof on-chain...");
 
       //TODO: Remove this insert line
-      await zkdb.insert(0, "Jack", fullRecord);
+      await zkdb.insert('counterstrike', "Jack", fullRecord);
 
       // Regenerate the proof
       const { proof, publicSignals } = await zkdb.genSignalProof({
         json: fullRecord,
-        col_id: 0,
+        col_id: 'counterstrike',
         path: "gamer",
         id: "Jack",
       });
