@@ -37,7 +37,7 @@ const {
   remove,
   bn,
   digits,
-} = require("../../sdk/uint");
+} = require("../sdk/uint");
 const fs = require('fs');
 const snarkjs = require("snarkjs");
 const crypto = require('crypto');
