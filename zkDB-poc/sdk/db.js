@@ -40,6 +40,7 @@ class DB {
     // Connect to MongoDB
     this.client = await MongoClient.connect(this.mongoUrl);
     this.db = this.client.db(this.dbName);
+    this.documents = this.db.collection('counterstrike');
     this.tree = await newMemEmptyTrie();
     this.cols = {};
   }
@@ -97,8 +98,9 @@ class DB {
     }
     const res_col = await this.updateDB(_col, colName);
     
-    // Insert document into MongoDB
-    await this.db.collection(colName).updateOne({ _id: _key }, { $set: _val }, { upsert: true });
+    // Ensure _val includes col_id and key fields
+    const documentToInsert = { ..._val, col_id: colName, key: _key };
+    await this.db.collection(colName).updateOne({ _id: _key }, { $set: documentToInsert }, { upsert: true });
 
     return { update, doc: res_doc, col: res_col, tree: _col.tree };
   }
@@ -165,14 +167,19 @@ class DB {
       const sp = p[0].split("[");
       for (let v of sp) {
         if (/]$/.test(v)) {
-          j = j[v.replace(/]$/, "") * 1];
+          j = j && j[v.replace(/]$/, "") * 1];
         } else {
-          j = j[v];
+          j = j && j[v];
+        }
+        // Add a check to see if j is undefined
+        if (j === undefined) {
+          return undefined;
         }
       }
       return this._getVal(j, p.slice(1));
     }
   }
+  
 
   getVal(j, p) {
     if (p === "") return j;
@@ -236,9 +243,20 @@ class DB {
   async query(col_id, id, path, json) {
     const document = await this.documents.findOne({ col_id, key: id });
     if (!document) {
+      console.error(`Document not found for col_id: ${col_id}, key: ${id}`);
       throw new Error('Document not found');
     }
-    const val = this.getVal(document.value, path);
+    console.log(`Document found:`, document);
+  
+    // Use the document directly if it doesn't contain a 'value' field
+    const valueToQuery = document.value ? document.value : document;
+  
+    const val = this.getVal(valueToQuery, path);
+    if (val === undefined) {
+      console.error(`Value not found for path: ${path}`);
+      throw new Error(`Value not found for path: ${path}`);
+    }
+  
     const inputs = await this.genProof({ col_id, id, json, path });
     const sigs = inputs.slice(8);
     const params = [[sigs[12], sigs[13], ...sigs.slice(1, 6)], inputs];
@@ -269,6 +287,8 @@ class DB {
         return (await this.zkdb.qRaw(...params)).map((n) => n.toString() * 1);
     }
   }
+  
+  
 
   async getRollupInputs({ queries }) {
     let write, _json;
