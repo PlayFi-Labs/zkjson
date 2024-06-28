@@ -309,79 +309,100 @@ async function main() {
     if (verificationAnswer.verificationType === 'Off Chain') {
       await pauseForUserInput("Press ENTER to regenerate and verify the proof off-chain...");
 
-      //TODO: Remove this insert line
-      await zkdb.insert('counterstrike', fullRecord.gamer, fullRecord);
+      const fullRecord = await zkdb.getJson('counterstrike', gamerAnswer.gamer);
 
-      // Regenerate the proof
-      const { proof, publicSignals } = await zkdb.genSignalProof({
-        json: fullRecord,
-        col_id: 'counterstrike',
-        path: "gamer",
-        id: extractGamer(fullRecord),
-      });
-
-      console.log(chalk.green.bold(`✔ Proof regenerated successfully`));
-
-      // Load the verification key from a file
-      const vkey = JSON.parse(fs.readFileSync(resolve(__dirname, "../../circom/build/circuits/db/verification_key.json")));
-
-      // Verify the proof off-chain
-      const isValid = await snarkjs.groth16.verify(vkey, publicSignals, proof);
-
-      if (isValid) {
-        console.log(chalk.green.bold(`✔ Off-chain proof verified successfully`));
+      if (fullRecord) {
+        console.log(chalk.green.bold(`✔ Gamer found in database`));
+        console.log(fullRecord);
       } else {
-        console.log("Off-chain proof verification failed.");
+        console.log("Gamer not found.");
         process.exit(1);
       }
+        
+      // Regenerate the proof
+      //const { proof, publicSignals } = await zkdb.genSignalProof({
+      //  json: fullRecord,
+      //  col_id: 'counterstrike',
+      //  path: "gamer",
+      //  id: extractGamer(fullRecord),
+      //});
+      //
+      //console.log(chalk.green.bold(`✔ Proof regenerated successfully`));
+
+      // Load the verification key from a file
+      //const vkey = JSON.parse(fs.readFileSync(resolve(__dirname, "../../circom/build/circuits/db/verification_key.json")));
+
+      // Verify the proof off-chain
+      //const isValid = await snarkjs.groth16.verify(vkey, publicSignals, proof);
+      //
+      //if (isValid) {
+      //  console.log(chalk.green.bold(`✔ Off-chain proof verified successfully`));
+      //} else {
+      //  console.log("Off-chain proof verification failed.");
+      //  process.exit(1);
+      //}
     }
 
     // Verify the proof on-chain
     if (verificationAnswer.verificationType === 'On Chain') {
       await pauseForUserInput("Press ENTER to verify the proof on-chain...");
 
-      //TODO: Remove this insert line
-      await zkdb.insert('counterstrike', fullRecord.gamer, fullRecord);
+      const fullRecord = await zkdb.getJson('counterstrike', gamerAnswer.gamer);
 
-      const isValidOnChain = await onChainVerification(zkdb, fullRecord);
-
-      if (isValidOnChain) {
-        console.log(chalk.green.bold(`✔ On-chain proof verified successfully`));
+      if (fullRecord) {
+        console.log(chalk.green.bold(`✔ Gamer found in database`));
+        console.log(fullRecord);
       } else {
-        console.log("On-chain proof verification failed.");
+        console.log("Gamer not found.");
         process.exit(1);
       }
+
+      //const isValidOnChain = await onChainVerification(zkdb, fullRecord);
+      //
+      //if (isValidOnChain) {
+      //  console.log(chalk.green.bold(`✔ On-chain proof verified successfully`));
+      //} else {
+      //  console.log("On-chain proof verification failed.");
+      //  process.exit(1);
+      //}
     }
 
     // Verify the proof with both methods
     if (verificationAnswer.verificationType === 'Both') {
       await pauseForUserInput("Press ENTER to verify the proof on-chain...");
 
-      //TODO: Remove this insert line
-      await zkdb.insert('counterstrike', fullRecord.gamer, fullRecord);
+      const fullRecord = await zkdb.getJson('counterstrike', gamerAnswer.gamer);
 
-      // Regenerate the proof
-      const { proof, publicSignals } = await zkdb.genSignalProof({
-        json: fullRecord,
-        col_id: 'counterstrike',
-        path: "gamer",
-        id: extractGamer(fullRecord),
-      });
-
-      // Load the verification key from a file
-      const vkey = JSON.parse(fs.readFileSync(resolve(__dirname, "../../circom/build/circuits/db/verification_key.json")));
-
-      // Verify the proof off-chain
-      const isValid = await snarkjs.groth16.verify(vkey, publicSignals, proof);
-
-      const isValidOnChain = await onChainVerification(zkdb, fullRecord);
-
-      if (isValidOnChain && isValid) {
-        console.log(chalk.green.bold(`✔ Proof verified successfully`));
+      if (fullRecord) {
+        console.log(chalk.green.bold(`✔ Gamer found in database`));
+        console.log(fullRecord);
       } else {
-        console.log("Proof verification failed.");
+        console.log("Gamer not found.");
         process.exit(1);
       }
+
+      // Regenerate the proof
+      //const { proof, publicSignals } = await zkdb.genSignalProof({
+      //  json: fullRecord,
+      //  col_id: 'counterstrike',
+      //  path: "gamer",
+      //  id: extractGamer(fullRecord),
+      //});
+
+      // Load the verification key from a file
+      //const vkey = JSON.parse(fs.readFileSync(resolve(__dirname, "../../circom/build/circuits/db/verification_key.json")));
+
+      // Verify the proof off-chain
+      //const isValid = await snarkjs.groth16.verify(vkey, publicSignals, proof);
+      //
+      //const isValidOnChain = await onChainVerification(zkdb, fullRecord);
+      //
+      //if (isValidOnChain && isValid) {
+      //  console.log(chalk.green.bold(`✔ Proof verified successfully`));
+      //} else {
+      //  console.log("Proof verification failed.");
+      //  process.exit(1);
+      //}
     }
 
     // Print the JSON without the zkProof

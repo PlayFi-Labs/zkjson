@@ -130,6 +130,10 @@ class DB {
     return await _col.get(_key);
   }
 
+  async getJson(colName, _key) {
+    return await this.documents.findOne({ col_id: colName, key: _key });
+  }
+
   async getCol(colName) {
     const colID = this.getIDForColName(colName);
     return await this.tree.find(colID);
