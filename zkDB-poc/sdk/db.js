@@ -105,6 +105,26 @@ class DB {
     return { update, doc: res_doc, col: res_col, tree: _col.tree };
   }
 
+  async queryJson(colName, _key, _val, _path) {
+    const _col = await this.getColTree(colName);
+    await _col.insert(_key, _val);
+    await this.updateDB(_col, colName);
+    
+    // Ensure _val includes col_id and key fields
+    const documentToGen = { ..._val, col_id: colName, key: _key };
+    
+    // Generate proof
+    const proofResult = await this.genProof({
+      json: documentToGen,
+      col_id: colName,
+      path: _path,
+      id: _key
+    });
+
+    // Return the proof result
+    return proofResult;
+  }
+
   async updateDB(_col, colName) {
     const root = _col.tree.F.toObject(_col.tree.root).toString();
     const colID = BigInt(this.getIDForColName(colName));  // Ensure col is a BigInt
