@@ -192,7 +192,7 @@ async function main() {
 
     await pauseForUserInput("Press ENTER to generate and verify the proof...");
 
-    await zkdb.insert('counterstrike', json.gamer, json);
+    await zkdb.insert('counterstrike', json.gamer, json, false);
 
     // Generate the proof
     const { proof, publicSignals } = await zkdb.genSignalProof({
@@ -269,7 +269,7 @@ async function main() {
     // Combine json with zkp to create finalJson
     const finalJson = { ...json, zkProof: proof };
 
-    await zkdb.insert('counterstrike', finalJson.gamer, finalJson);
+    await zkdb.insert('counterstrike', finalJson.gamer, finalJson, true);
 
     process.exit(0);
 
@@ -323,7 +323,7 @@ async function main() {
     if (verificationAnswer.verificationType === 'Off Chain') {
       await pauseForUserInput("Press ENTER to regenerate and verify the proof off-chain...");
 
-      const zkp = await zkdb.queryJson('counterstrike', fullRecord.gamer, fullRecord, "gamer");
+      const zkp = await zkdb.queryJson('counterstrike', fullRecord.gamer, fullRecord, "gamer", false);
 
       if (zkp) {
         console.log(chalk.green.bold(`✔ Gamer found in database`));
@@ -360,7 +360,7 @@ async function main() {
     if (verificationAnswer.verificationType === 'On Chain') {
       await pauseForUserInput("Press ENTER to verify the proof on-chain...");
 
-      const zkp = await zkdb.queryJson('counterstrike', fullRecord.gamer, fullRecord, "gamer");
+      const zkp = await zkdb.queryJson('counterstrike', fullRecord.gamer, fullRecord, "gamer", false);
 
       if (zkp) {
         console.log(chalk.green.bold(`✔ Gamer found in database`));
@@ -383,7 +383,7 @@ async function main() {
     if (verificationAnswer.verificationType === 'Both') {
       await pauseForUserInput("Press ENTER to verify the proof on-chain...");
 
-      const zkp = await zkdb.queryJson('counterstrike', fullRecord.gamer, fullRecord, "gamer");
+      const zkp = await zkdb.queryJson('counterstrike', fullRecord.gamer, fullRecord, "gamer", false);
 
       if (zkp) {
         console.log(chalk.green.bold(`✔ Gamer found in database`));

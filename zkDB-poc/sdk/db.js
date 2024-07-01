@@ -49,21 +49,11 @@ class DB {
     await this.client.close();
   }
 
-  async createNewCollection(collectionName) {
+  async createNewCollection(collectionName, store) {
     if (!collectionName || typeof collectionName !== 'string') {
       throw new Error('Invalid collection name');
     }
-    try {
-      await this.db.createCollection(collectionName);
-      console.log(`Collection '${collectionName}' created successfully`);
-    } catch (error) {
-      if (error.codeName === 'NamespaceExists') {
-        console.log(`Collection '${collectionName}' already exists.`);
-      } else {
-        throw error;
-      }
-    }
-
+    
     let _col = this.cols[collectionName];
     if (!_col) {
       _col = new Collection({
@@ -75,44 +65,61 @@ class DB {
       await _col.init();
       this.cols[collectionName] = _col;
     }
+
+    if (store) {
+      try {
+        await this.db.createCollection(collectionName);
+        console.log(`Collection '${collectionName}' created successfully`);
+      } catch (error) {
+        if (error.codeName === 'NamespaceExists') {
+          console.log(`Collection '${collectionName}' already exists.`);
+        } else {
+          throw error;
+        }
+      }
+    }
+
     return _col;
   }
 
-  async getColTree(colName) {
+  async getColTree(colName, store) {
     let _col = this.cols[colName];
     if (!_col) {
-      _col = await this.createNewCollection(colName);
+      _col = await this.createNewCollection(colName, store);
     }
     return _col;
   }
 
-  async insert(colName, _key, _val) {
-    const _col = await this.getColTree(colName);
+  async insert(colName, _key, _val, store) {
+    const _col = await this.getColTree(colName, store);
     let update = false;
     let res_doc;
+
     if ((await _col.get(_key)).found) {
       update = true;
       res_doc = await _col.update(_key, _val);
     } else {
-      res_doc = await _col.insert(_key, _val);
+      res_doc = await _col.insert(_key, _val, store);
     }
+
     const res_col = await this.updateDB(_col, colName);
-    
+
     // Ensure _val includes col_id and key fields
     const documentToInsert = { ..._val, col_id: colName, key: _key };
-    await this.db.collection(colName).updateOne({ _id: _key }, { $set: documentToInsert }, { upsert: true });
-
+    if (store) {
+      await this.db.collection(colName).updateOne({ _id: _key }, { $set: documentToInsert }, { upsert: true });
+    }
     return { update, doc: res_doc, col: res_col, tree: _col.tree };
   }
 
-  async queryJson(colName, _key, _val, _path) {
-    const _col = await this.getColTree(colName);
-    await _col.insert(_key, _val);
+  async queryJson(colName, _key, _val, _path, store) {
+    const _col = await this.getColTree(colName, store);
+    await _col.insert(_key, _val, store);
     await this.updateDB(_col, colName);
-    
+
     // Ensure _val includes col_id and key fields
     const documentToGen = { ..._val, col_id: colName, key: _key };
-    
+
     // Generate proof
     const proofResult = await this.genProof({
       json: documentToGen,
@@ -132,21 +139,23 @@ class DB {
   }
 
   async update(colName, _key, _val) {
-    const _col = await this.getColTree(colName);
+    const _col = await this.getColTree(colName, true); // store is always true for update
     const res_doc = await _col.update(_key, _val);
     const res_col = await this.updateDB(_col, colName);
+    await this.db.collection(colName).updateOne({ _id: _key }, { $set: { ..._val, col_id: colName, key: _key } }, { upsert: true });
     return { doc: res_doc, col: res_col, tree: _col.tree };
   }
 
   async delete(colName, _key) {
-    const _col = await this.getColTree(colName);
+    const _col = await this.getColTree(colName, true); // store is always true for delete
     const res_doc = await _col.delete(_key);
     const res_col = await this.updateDB(_col, colName);
+    await this.db.collection(colName).deleteOne({ _id: _key });
     return { doc: res_doc, col: res_col, tree: _col.tree };
   }
 
   async get(colName, _key) {
-    const _col = await this.getColTree(colName);
+    const _col = await this.getColTree(colName, true); // store is always true for get
     return await _col.get(_key);
   }
 
@@ -203,7 +212,6 @@ class DB {
       return this._getVal(j, p.slice(1));
     }
   }
-  
 
   getVal(j, p) {
     if (p === "") return j;
@@ -271,16 +279,16 @@ class DB {
       throw new Error('Document not found');
     }
     console.log(`Document found:`, document);
-  
+
     // Use the document directly if it doesn't contain a 'value' field
     const valueToQuery = document.value ? document.value : document;
-  
+
     const val = this.getVal(valueToQuery, path);
     if (val === undefined) {
       console.error(`Value not found for path: ${path}`);
       throw new Error(`Value not found for path: ${path}`);
     }
-  
+
     const inputs = await this.genProof({ col_id, id, json, path });
     const sigs = inputs.slice(8);
     const params = [[sigs[12], sigs[13], ...sigs.slice(1, 6)], inputs];
@@ -311,8 +319,6 @@ class DB {
         return (await this.zkdb.qRaw(...params)).map((n) => n.toString() * 1);
     }
   }
-  
-  
 
   async getRollupInputs({ queries }) {
     let write, _json;
@@ -404,7 +410,7 @@ class DB {
       tree,
       col: res2,
       doc: res,
-    } = await this.insert(col_id, id, json);
+    } = await this.insert(col_id, id, json, true); // store is always true for query inputs
     const icol = this.parse(res, tree, this.level);
     const idb = this.parse(res2, this.tree, this.level_col);
     const newKey = toIndex(id);
@@ -439,7 +445,7 @@ class DB {
     while (col_siblings.length < this.level_col) col_siblings.push(0);
     col_siblings = col_siblings.map(s => s.toString());
     const col_key = this.getIDForColName(col_id);
-    const col = await this.getColTree(col_id);
+    const col = await this.getColTree(col_id, true); // store is always true for inputs
     const col_inputs = await col.getInputs({ id, json, path, val });
     return {
       path: col_inputs.path,
