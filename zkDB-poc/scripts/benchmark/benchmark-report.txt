@@ -1,0 +1,4 @@
+Write-OnChain - 8.053575 seconds
+Write-OffChain - 4.544707 seconds
+Query-OnChain - 8.487131 seconds
+Query-OffChain - 3.147103 seconds

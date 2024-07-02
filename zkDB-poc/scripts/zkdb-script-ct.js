@@ -1,43 +1,5 @@
 const { resolve } = require("path");
-const MongoClient = require('mongodb').MongoClient;
-const {
-  path,
-  val,
-  toSignal,
-  fromSignal,
-  pad,
-  encode,
-  decode,
-  encodePath,
-  decodePath,
-  encodeVal,
-  decodeVal,
-  encodeQuery,
-  decodeQuery,
-  DB,
-} = require("../sdk");
-const {
-  insert,
-  slice,
-  unshift,
-  shift,
-  toArray,
-  pop,
-  length,
-  push,
-  next,
-  arr,
-  last,
-  replace,
-  get,
-  pushArray,
-  arrPush,
-  arrGet,
-  popArray,
-  remove,
-  bn,
-  digits,
-} = require("../sdk/uint");
+const { DB } = require("../sdk");
 const fs = require('fs');
 const snarkjs = require("snarkjs");
 const crypto = require('crypto');
@@ -73,7 +35,6 @@ async function main() {
     ]);
   }
   async function initializeZKDB() {
-  
     // Initialize the zkDB with the wasm, zkey files, and MongoDB details
     const zkdb = new DB({
       wasm,
@@ -85,7 +46,6 @@ async function main() {
     await zkdb.addCollection();
     return zkdb;
   }
-  
   
   // On-chain verification
   async function onChainVerification(zkdb, fullRecord) {
@@ -105,9 +65,9 @@ async function main() {
     // Generate the proof
     const zkp = await zkdb.genProof({
       json: fullRecord,
-      col_id: 0,
+      col_id: 'counterstrike',
       path: "gamer",
-      id: "Jack",
+      id: extractGamer(fullRecord),
     });
   
     try {
@@ -131,6 +91,25 @@ async function main() {
     hash.update(jsonString);
     const fingerprint = hash.digest('hex');
     return fingerprint;
+  }
+
+  // Extract the gamer field from the JSON
+  function extractGamer(json) {
+    return `"${json.gamer}"`;
+  }
+
+  // Filter the fields to keep only the necessary ones to show
+  function filterFields(originalJson) {
+    const fieldsToKeep = ['gamer', 'strikes', 'place', 'weapon', 'place2'];
+    const filteredJson = {};
+  
+    fieldsToKeep.forEach(field => {
+      if (originalJson.hasOwnProperty(field)) {
+        filteredJson[field] = originalJson[field];
+      }
+    });
+  
+    return filteredJson;
   }
 
   // Initialize the zkDB instance
@@ -173,14 +152,14 @@ async function main() {
 
     await pauseForUserInput("Press ENTER to generate and verify the proof...");
 
-    await zkdb.insert(0, "Jack", json);
+    await zkdb.insert('counterstrike', json.gamer, json, false);
 
     // Generate the proof
     const { proof, publicSignals } = await zkdb.genSignalProof({
       json: json,
-      col_id: 0,
+      col_id: 'counterstrike',
       path: "gamer",
-      id: "Jack",
+      id: extractGamer(json),
     });
 
     console.log(chalk.green.bold(`✔ Proof generated successfully`));
@@ -250,18 +229,7 @@ async function main() {
     // Combine json with zkp to create finalJson
     const finalJson = { ...json, zkProof: proof };
 
-    // Insert finalJson into the database
-    const collection1 = zkdb.db.collection('counterstrike');
-    const insertResult = await collection1.insertOne(finalJson);
-
-    if (insertResult.acknowledged) {
-      console.log("Storing in storage layer...");
-      console.log(chalk.green.bold(`✔ Process completed and JSON saved in Storage layer`));
-      console.log("Final JSON with proof included:", finalJson);
-    } else {
-      console.log("Error inserting into database.");
-      process.exit(1);
-    }
+    await zkdb.insert('counterstrike', finalJson.gamer, finalJson, true);
 
     process.exit(0);
 
@@ -315,17 +283,23 @@ async function main() {
     if (verificationAnswer.verificationType === 'Off Chain') {
       await pauseForUserInput("Press ENTER to regenerate and verify the proof off-chain...");
 
-      //TODO: Remove this insert line
-      await zkdb.insert(0, "Jack", fullRecord);
+      const zkp = await zkdb.queryJson('counterstrike', fullRecord.gamer, fullRecord, "gamer", false);
 
+      if (zkp) {
+        console.log(chalk.green.bold(`✔ Gamer found in database`));
+      } else {
+        console.log("Gamer not found.");
+        process.exit(1);
+      }
+        
       // Regenerate the proof
       const { proof, publicSignals } = await zkdb.genSignalProof({
         json: fullRecord,
-        col_id: 0,
+        col_id: 'counterstrike',
         path: "gamer",
-        id: "Jack",
+        id: extractGamer(fullRecord),
       });
-
+      
       console.log(chalk.green.bold(`✔ Proof regenerated successfully`));
 
       // Load the verification key from a file
@@ -333,7 +307,7 @@ async function main() {
 
       // Verify the proof off-chain
       const isValid = await snarkjs.groth16.verify(vkey, publicSignals, proof);
-
+      
       if (isValid) {
         console.log(chalk.green.bold(`✔ Off-chain proof verified successfully`));
       } else {
@@ -346,11 +320,17 @@ async function main() {
     if (verificationAnswer.verificationType === 'On Chain') {
       await pauseForUserInput("Press ENTER to verify the proof on-chain...");
 
-      //TODO: Remove this insert line
-      await zkdb.insert(0, "Jack", fullRecord);
+      const zkp = await zkdb.queryJson('counterstrike', fullRecord.gamer, fullRecord, "gamer", false);
+
+      if (zkp) {
+        console.log(chalk.green.bold(`✔ Gamer found in database`));
+      } else {
+        console.log("Gamer not found.");
+        process.exit(1);
+      }
 
       const isValidOnChain = await onChainVerification(zkdb, fullRecord);
-
+      
       if (isValidOnChain) {
         console.log(chalk.green.bold(`✔ On-chain proof verified successfully`));
       } else {
@@ -363,15 +343,21 @@ async function main() {
     if (verificationAnswer.verificationType === 'Both') {
       await pauseForUserInput("Press ENTER to verify the proof on-chain...");
 
-      //TODO: Remove this insert line
-      await zkdb.insert(0, "Jack", fullRecord);
+      const zkp = await zkdb.queryJson('counterstrike', fullRecord.gamer, fullRecord, "gamer", false);
+
+      if (zkp) {
+        console.log(chalk.green.bold(`✔ Gamer found in database`));
+      } else {
+        console.log("Gamer not found.");
+        process.exit(1);
+      }
 
       // Regenerate the proof
       const { proof, publicSignals } = await zkdb.genSignalProof({
         json: fullRecord,
-        col_id: 0,
+        col_id: 'counterstrike',
         path: "gamer",
-        id: "Jack",
+        id: extractGamer(fullRecord),
       });
 
       // Load the verification key from a file
@@ -379,13 +365,13 @@ async function main() {
 
       // Verify the proof off-chain
       const isValid = await snarkjs.groth16.verify(vkey, publicSignals, proof);
-
+      
       const isValidOnChain = await onChainVerification(zkdb, fullRecord);
-
+      
       if (isValidOnChain && isValid) {
-        console.log(chalk.green.bold(`✔ Proof verified successfully`));
+        console.log(chalk.green.bold(`✔ Both Proofs verified successfully`));
       } else {
-        console.log("Proof verification failed.");
+        console.log("Both Proof System verification failed.");
         process.exit(1);
       }
     }
@@ -394,7 +380,7 @@ async function main() {
     const { _id, zkProof, fingerprint, ...regeneratedJson } = fullRecord;
 
     console.log(chalk.bold(`✔ Regenerated JSON:`));
-    console.log(chalk.green.bold(JSON.stringify(regeneratedJson, null, 2)));
+    console.log(chalk.green.bold(JSON.stringify(filterFields(regeneratedJson), null, 2)));
 
     process.exit(0);
   } else {
