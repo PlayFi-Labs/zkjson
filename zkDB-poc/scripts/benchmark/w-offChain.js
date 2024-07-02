@@ -45,13 +45,12 @@ async function main() {
   
   const vkey = JSON.parse(fs.readFileSync(resolve(__dirname, "../../../circom/build/circuits/db/verification_key.json")));
   const isValid = await snarkjs.groth16.verify(vkey, publicSignals, proof);
-  const end = process.hrtime(start);
-
-  const timeInSeconds = end[0] + end[1] / 1e9;
-  fs.appendFileSync(resolve(__dirname, "benchmark-report.txt"), `Write-OffChain - ${timeInSeconds.toFixed(6)} seconds\n`, 'utf8');
 
   if (isValid) {
     await zkdb.insert('counterstrike', json.gamer, { ...json, zkProof: proof }, true);
+    const end = process.hrtime(start);
+    const timeInSeconds = end[0] + end[1] / 1e9;
+    fs.appendFileSync(resolve(__dirname, "benchmark-report.txt"), `Write-OffChain - ${timeInSeconds.toFixed(6)} seconds\n`, 'utf8');
   } else {
     console.error("Off-chain proof verification failed.");
   }

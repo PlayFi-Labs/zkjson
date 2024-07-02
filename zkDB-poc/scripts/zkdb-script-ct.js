@@ -1,43 +1,5 @@
 const { resolve } = require("path");
-const MongoClient = require('mongodb').MongoClient;
-const {
-  path,
-  val,
-  toSignal,
-  fromSignal,
-  pad,
-  encode,
-  decode,
-  encodePath,
-  decodePath,
-  encodeVal,
-  decodeVal,
-  encodeQuery,
-  decodeQuery,
-  DB,
-} = require("../sdk");
-const {
-  insert,
-  slice,
-  unshift,
-  shift,
-  toArray,
-  pop,
-  length,
-  push,
-  next,
-  arr,
-  last,
-  replace,
-  get,
-  pushArray,
-  arrPush,
-  arrGet,
-  popArray,
-  remove,
-  bn,
-  digits,
-} = require("../sdk/uint");
+const { DB } = require("../sdk");
 const fs = require('fs');
 const snarkjs = require("snarkjs");
 const crypto = require('crypto');
@@ -73,7 +35,6 @@ async function main() {
     ]);
   }
   async function initializeZKDB() {
-  
     // Initialize the zkDB with the wasm, zkey files, and MongoDB details
     const zkdb = new DB({
       wasm,
@@ -85,7 +46,6 @@ async function main() {
     await zkdb.addCollection();
     return zkdb;
   }
-  
   
   // On-chain verification
   async function onChainVerification(zkdb, fullRecord) {

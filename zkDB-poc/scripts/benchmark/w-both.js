@@ -77,13 +77,12 @@ async function main() {
   const isValidOffChain = await snarkjs.groth16.verify(vkey, publicSignals, proof);
 
   const isValidOnChain = await onChainVerification(zkdb, json);
-  const end = process.hrtime(start);
-
-  const timeInSeconds = end[0] + end[1] / 1e9;
-  fs.appendFileSync(resolve(__dirname, "benchmark-report.txt"), `Write-Both - ${timeInSeconds.toFixed(6)} seconds\n`, 'utf8');
 
   if (isValidOffChain && isValidOnChain) {
     await zkdb.insert('counterstrike', json.gamer, { ...json, zkProof: proof }, true);
+    const end = process.hrtime(start);
+    const timeInSeconds = end[0] + end[1] / 1e9;
+    fs.appendFileSync(resolve(__dirname, "benchmark-report.txt"), `Write-Both - ${timeInSeconds.toFixed(6)} seconds\n`, 'utf8');
   } else {
     console.error("Both proof verifications failed.");
   }

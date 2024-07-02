@@ -53,6 +53,7 @@ async function onChainVerification(zkdb, fullRecord) {
 async function main() {
   const zkdb = await initializeZKDB();
 
+  const start = process.hrtime();
   const collection = zkdb.db.collection('counterstrike');
   const fullRecord = await collection.findOne({ "gamer": "Merkle" });
 
@@ -61,7 +62,6 @@ async function main() {
     process.exit(1);
   }
 
-  const start = process.hrtime();
   await zkdb.queryJson('counterstrike', fullRecord.gamer, fullRecord, "gamer", false);
   const isValidOnChain = await onChainVerification(zkdb, fullRecord);
   const end = process.hrtime(start);

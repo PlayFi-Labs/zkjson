@@ -90,6 +90,11 @@ class DB {
     return _col;
   }
 
+  // Insert document
+  /// @param {String} colName - The collection name
+  /// @param {String} _key - The document ID
+  /// @param {Object} _val - The document value
+  /// @param {Boolean} store - Whether to store the document in the database
   async insert(colName, _key, _val, store) {
     const _col = await this.getColTree(colName, store);
     let update = false;
@@ -112,6 +117,12 @@ class DB {
     return { update, doc: res_doc, col: res_col, tree: _col.tree };
   }
 
+  // Insert JSON document
+  /// @param {String} colName - The collection name
+  /// @param {String} _key - The document ID
+  /// @param {Object} _val - The document value
+  /// @param {String} _path - The path to query
+  /// @param {Boolean} store - Whether to store the document in the database
   async queryJson(colName, _key, _val, _path, store) {
     const _col = await this.getColTree(colName, store);
     await _col.insert(_key, _val, store);
@@ -240,6 +251,11 @@ class DB {
     ];
   }
 
+  // Generate proof for signal
+  /// @param {Object} json - The JSON object to query
+  /// @param {String} col_id - The collection ID
+  /// @param {String} path - The path to query
+  /// @param {String} id - The document ID
   async genSignalProof({ json, col_id, path, id }) {
     const inputs = await this.getInputs({
       id,
