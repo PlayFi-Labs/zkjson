@@ -59,7 +59,7 @@ async function onChainVerification(zkdb, fullRecord, reportPath) {
     end = process.hrtime(start);
     let verificationProcessTime = end[0] + end[1] / 1e9;
     fs.appendFileSync(reportPath, `OnChain verification (verify process) - ${verificationProcessTime.toFixed(6)} seconds\n`, 'utf8');
-    return result;
+    return { result, zkp };
   } catch (error) {
     console.error("On-chain verification failed:", error);
     return false;
@@ -96,26 +96,14 @@ async function main() {
   let zkdbInsertionTime = end[0] + end[1] / 1e9;
   fs.appendFileSync(reportPath, `zkdb insertion - ${zkdbInsertionTime.toFixed(6)} seconds\n`, 'utf8');
 
-  // Measure proof generation time
-  start = process.hrtime();
-  const { proof, publicSignals } = await zkdb.genSignalProof({
-    json: json,
-    col_id: 'counterstrike',
-    path: "gamer",
-    id: `"${json.gamer}"`,
-  });
-  end = process.hrtime(start);
-  let proofGenerationTime = end[0] + end[1] / 1e9;
-  fs.appendFileSync(reportPath, `Proof generation - ${proofGenerationTime.toFixed(6)} seconds\n`, 'utf8');
-
   // Measure on-chain verification time
-  const isValidOnChain = await onChainVerification(zkdb, json, reportPath);
+  const res = await onChainVerification(zkdb, json, reportPath);
 
   // Measure final insertion in MongoDB time
   let finalInsertionTime = 0;
-  if (isValidOnChain) {
+  if (res.result) {
     start = process.hrtime();
-    await zkdb.insert('counterstrike', json.gamer, { ...json, zkProof: proof }, true);
+    await zkdb.insert('counterstrike', json.gamer, { ...json, zkProof: res.zkp }, true);
     end = process.hrtime(start);
     finalInsertionTime = end[0] + end[1] / 1e9;
     fs.appendFileSync(reportPath, `Final insertion in MongoDB - ${finalInsertionTime.toFixed(6)} seconds\n`, 'utf8');
