@@ -49,8 +49,12 @@ async function onChainVerification(zkdb, fullRecord, reportPath) {
     path: "gamer",
     id: `"${fullRecord.gamer}"`,
   });
+  end = process.hrtime(start);
+  let proofGenerationProcess = end[0] + end[1] / 1e9;
+  fs.appendFileSync(reportPath, `OnChain verification (proof genration process) - ${proofGenerationProcess.toFixed(6)} seconds\n`, 'utf8');
 
   try {
+    start = process.hrtime();
     const result = await myru.validateProof(zkp);
     end = process.hrtime(start);
     let verificationProcessTime = end[0] + end[1] / 1e9;
