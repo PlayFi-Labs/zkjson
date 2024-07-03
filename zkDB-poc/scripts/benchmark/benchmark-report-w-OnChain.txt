@@ -1,7 +1,7 @@
 Fingerprint creation - 0.000094 seconds
 zkdb insertion - 0.431560 seconds
 OnChain verification (ethers setup) - 0.409294 seconds
-OnChain verification (proof genration process) - 3.928076 seconds
+OnChain verification (proof generation process) - 3.928076 seconds
 OnChain verification (verify process) - 0.016514 seconds
 Final insertion in MongoDB - 0.331994 seconds
 Total - 5.123076 seconds

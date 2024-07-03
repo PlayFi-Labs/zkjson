@@ -51,7 +51,7 @@ async function onChainVerification(zkdb, fullRecord, reportPath) {
   });
   end = process.hrtime(start);
   let proofGenerationProcess = end[0] + end[1] / 1e9;
-  fs.appendFileSync(reportPath, `OnChain verification (proof genration process) - ${proofGenerationProcess.toFixed(6)} seconds\n`, 'utf8');
+  fs.appendFileSync(reportPath, `OnChain verification (proof generation process) - ${proofGenerationProcess.toFixed(6)} seconds\n`, 'utf8');
 
   try {
     start = process.hrtime();
