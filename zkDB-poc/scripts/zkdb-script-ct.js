@@ -4,28 +4,30 @@ const fs = require('fs');
 const snarkjs = require("snarkjs");
 const crypto = require('crypto');
 require("@nomiclabs/hardhat-ethers");
-
-
 require('dotenv').config({ path: resolve(__dirname, '../../.env') });
 require('events').EventEmitter.defaultMaxListeners = 15;
 
+const { ethers } = require("ethers");
+const { Provider } = require("zksync-ethers");
 
 async function main() {
 
-  // Dynamically import inquirer and chalk
   const { default: inquirer } = await import('inquirer');
   const { default: chalk } = await import('chalk');
 
   const wasm = resolve(__dirname, "../../circom/build/circuits/db/index_js/index.wasm");
   const zkey = resolve(__dirname, "../../circom/build/circuits/db/index_0001.zkey");
 
-  // Connect to the MongoDB server
   const url = process.env.MONGO_URL;
   const dbName = process.env.MONGO_DB;
 
-  // Pause for user input
+  const zkSyncUrl = "https://sepolia.era.zksync.dev";
+  const provider = new Provider(zkSyncUrl);
+  const PRIVATE_KEY = process.env.ZKSYNC_SEPOLIA_PRIVATE_KEY || "";
+  const wallet = new ethers.Wallet(PRIVATE_KEY).connect(provider);
+  const contractAddress = process.env.FINGERPRINT_PROXY_SC;
+
   async function pauseForUserInput(message) {
-    const { default: inquirer } = await import('inquirer');
     await inquirer.prompt([
       {
         type: 'input',
@@ -34,8 +36,8 @@ async function main() {
       }
     ]);
   }
+
   async function initializeZKDB() {
-    // Initialize the zkDB with the wasm, zkey files, and MongoDB details
     const zkdb = new DB({
       wasm,
       zkey,
@@ -46,22 +48,85 @@ async function main() {
     await zkdb.addCollection();
     return zkdb;
   }
-  
+
+  async function insertFingerprint(fingerprint) {
+    const functionSignature = "appendData(bytes32)";
+    const functionHash = ethers.keccak256(ethers.toUtf8Bytes(functionSignature)).slice(0, 10);
+    const dataHashPadded = fingerprint.slice(2).padStart(64, "0");
+    const data = functionHash + dataHashPadded;
+
+    try {
+      const tx = await wallet.sendTransaction({
+        to: contractAddress,
+        data: data,
+      });
+      console.log(`Transaction sent: ${tx.hash}`);
+      await tx.wait();
+      console.log("Transaction confirmed");
+    } catch (error) {
+      console.error(`Transaction failed: ${error.message}`);
+      console.error(`Error details: ${JSON.stringify(error, null, 2)}`);
+
+      if (error.data) {
+        try {
+          const reason = ethers.toUtf8String('0x' + error.data.slice(138));
+          console.error(`Revert reason: ${reason}`);
+        } catch (innerError) {
+          console.error(`Failed to decode revert reason: ${innerError.message}`);
+        }
+      }
+    }
+  }
+
+  async function checkFingerprint(fingerprint) {
+    const functionSignatureCheck = "isHashAppended(bytes32)";
+    const functionHashCheck = ethers.keccak256(ethers.toUtf8Bytes(functionSignatureCheck)).slice(0, 10);
+    const dataHashPadded = fingerprint.slice(2).padStart(64, "0");
+    const dataCheck = functionHashCheck + dataHashPadded;
+
+    const result = await provider.call({
+      to: contractAddress,
+      data: dataCheck,
+      from: wallet.address,
+    });
+
+    const isAppended = ethers.AbiCoder.defaultAbiCoder().decode(["bool"], result)[0];
+    return isAppended;
+  }
+
   // On-chain verification
   async function onChainVerification(zkdb, fullRecord) {
-    const [committer] = await ethers.getSigners();
-    const VerifierRU = await ethers.getContractFactory("Groth16VerifierRU");
-    const verifierRU = await VerifierRU.deploy();
+
+    const privateKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
+    const committer = new ethers.Wallet(privateKey, provider);
+
+    const VerifierRU = new ethers.ContractFactory(
+      require('../artifacts/contracts/verifier_rollup.sol/Groth16VerifierRU.json').abi,
+      require('../artifacts/contracts/verifier_rollup.sol/Groth16VerifierRU.json').bytecode,
+      committer
+    );
+    const verifierRU = await VerifierRU.deploy({ gasLimit: 3000000 });
     await verifierRU.deployed();
+    console.log(`VerifierRU deployed to: ${verifierRU.address}`);
     
-    const VerifierDB = await ethers.getContractFactory("Groth16VerifierDB");
-    const verifierDB = await VerifierDB.deploy();
+    const VerifierDB = new ethers.ContractFactory(
+        require('../artifacts/contracts/verifier_db.sol/Groth16VerifierDB.json').abi,
+        require('../artifacts/contracts/verifier_db.sol/Groth16VerifierDB.json').bytecode,
+        committer
+    );
+    const verifierDB = await VerifierDB.deploy({ gasLimit: 3000000 });
     await verifierDB.deployed();
+    console.log(`VerifierDB deployed to: ${verifierDB.address}`);
   
-    const MyRU = await ethers.getContractFactory("MyRollup");
-    const myru = await MyRU.deploy(verifierRU.address, verifierDB.address, committer.address);
+    const MyRU = new ethers.ContractFactory(
+        require('../artifacts/contracts/MyRollup.sol/MyRollup.json').abi,
+        require('../artifacts/contracts/MyRollup.sol/MyRollup.json').bytecode,
+        committer
+    );
+    const myru = await MyRU.deploy(verifierRU.address, verifierDB.address, committer.address, { gasLimit: 3000000 });
     await myru.deployed();
-  
+    console.log(`MyRU deployed to: ${myru.address}`);
+    
     // Generate the proof
     const zkp = await zkdb.genProof({
       json: fullRecord,
@@ -84,21 +149,18 @@ async function main() {
     }
   }
 
-  // Create a fingerprint for the JSON information
   function createFingerprint(json) {
     const jsonString = JSON.stringify(json);
     const hash = crypto.createHash('sha256');
     hash.update(jsonString);
     const fingerprint = hash.digest('hex');
-    return fingerprint;
+    return '0x' + fingerprint; 
   }
 
-  // Extract the gamer field from the JSON
   function extractGamer(json) {
     return `"${json.gamer}"`;
   }
 
-  // Filter the fields to keep only the necessary ones to show
   function filterFields(originalJson) {
     const fieldsToKeep = ['gamer', 'strikes', 'place', 'weapon', 'place2'];
     const filteredJson = {};
@@ -112,7 +174,6 @@ async function main() {
     return filteredJson;
   }
 
-  // Initialize the zkDB instance
   const zkdb = await initializeZKDB();
 
   const operationAnswer = await inquirer.prompt([
@@ -141,10 +202,7 @@ async function main() {
       process.exit(1);
     }
 
-    // Create a fingerprint for the JSON information
     const fingerprint = createFingerprint(jsonInfo);
-
-    // Combine the JSON information with the fingerprint
     const json = { ...jsonInfo, fingerprint: fingerprint };
 
     console.log(chalk.green.bold(`✔ Json info and generated fingerprint`));
@@ -153,8 +211,16 @@ async function main() {
     await pauseForUserInput("Press ENTER to generate and verify the proof...");
 
     await zkdb.insert('counterstrike', json.gamer, json, false);
+    await insertFingerprint(fingerprint);
+    const fingerPrintInserted = await checkFingerprint(fingerprint);
 
-    // Generate the proof
+    if (fingerPrintInserted) {
+      console.log(chalk.green.bold(`✔ FingerPrint inserted successfully`));
+    } else {
+      console.log("FingerPrint insert failed");
+      process.exit(1);
+    }
+
     const { proof, publicSignals } = await zkdb.genSignalProof({
       json: json,
       col_id: 'counterstrike',
@@ -173,14 +239,11 @@ async function main() {
       }
     ]);
 
-    // Verify the proof off-chain
     if (verificationAnswer.verificationType === 'Off Chain') {
       await pauseForUserInput("Press ENTER to verify the proof off-chain...");
 
-      // Load the verification key from a file
       const vkey = JSON.parse(fs.readFileSync(resolve(__dirname, "../../circom/build/circuits/db/verification_key.json")));
 
-      // Verify the proof off-chain
       const isValid = await snarkjs.groth16.verify(vkey, publicSignals, proof);
 
       if (isValid) {
@@ -190,7 +253,7 @@ async function main() {
         process.exit(1);
       }
     }
-    // Verify the proof on-chain
+
     if (verificationAnswer.verificationType === 'On Chain') {
       await pauseForUserInput("Press ENTER to verify the proof on-chain...");
 
@@ -204,36 +267,30 @@ async function main() {
       }
     }
 
-    // Verify the proof with both methods
     if (verificationAnswer.verificationType === 'Both') {
       await pauseForUserInput("Press ENTER to verify the proof with both methods...");
 
-      // Load the verification key from a file
       const vkey = JSON.parse(fs.readFileSync(resolve(__dirname, "../../circom/build/circuits/db/verification_key.json")));
 
-      // Verify the proof off-chain
       const isValid = await snarkjs.groth16.verify(vkey, publicSignals, proof);
-
       const isValidOnChain = await onChainVerification(zkdb, json);
 
       if (isValidOnChain && isValid) {
-        console.log(chalk.green.bold(`✔ On-chain proof verified successfully`));
+        console.log(chalk.green.bold(`✔ Both proofs verified successfully`));
       } else {
-        console.log("On-chain proof verification failed.");
+        console.log("Both proof verification failed.");
         process.exit(1);
       }
     }
 
     await pauseForUserInput("Press ENTER to save the final JSON in the database...");
 
-    // Combine json with zkp to create finalJson
     const finalJson = { ...json, zkProof: proof };
 
     await zkdb.insert('counterstrike', finalJson.gamer, finalJson, true);
 
     process.exit(0);
 
-    // Query the database
   } else if (operationAnswer.operation === 'query') {
     const gamerAnswer = await inquirer.prompt([
       {
@@ -243,10 +300,8 @@ async function main() {
       }
     ]);
 
-    // collection1 is the collection in the database
     const collection1 = zkdb.db.collection('counterstrike');
 
-    // Find the gamer in the database
     const fullRecord = await collection1.findOne({ "gamer": gamerAnswer.gamer });
 
     if (!fullRecord) {
@@ -254,17 +309,17 @@ async function main() {
       process.exit(1);
     }
 
-    // Extract the necessary fields for fingerprint calculation
     const { "gamer": gamer, "strikes": strikes, "place": place, "weapon": weapon, "place2": place2 } = fullRecord;
     const recordForFingerprint = { "gamer": gamer, "strikes": strikes, "place": place, "weapon": weapon, "place2": place2 };
 
     console.log(chalk.green.bold(`✔ Gamer found in database`));
     console.log(recordForFingerprint);
 
-    // Regenerate the fingerprint
     const regeneratedFingerprint = createFingerprint(recordForFingerprint);
 
-    if (regeneratedFingerprint !== fullRecord.fingerprint) {
+    const isAppended = await checkFingerprint(fullRecord.fingerprint);
+
+    if (!isAppended) {
       console.log("Fingerprint does not match.");
       process.exit(1);
     }
@@ -291,23 +346,20 @@ async function main() {
         console.log("Gamer not found.");
         process.exit(1);
       }
-        
-      // Regenerate the proof
+
       const { proof, publicSignals } = await zkdb.genSignalProof({
         json: fullRecord,
         col_id: 'counterstrike',
         path: "gamer",
         id: extractGamer(fullRecord),
       });
-      
+
       console.log(chalk.green.bold(`✔ Proof regenerated successfully`));
 
-      // Load the verification key from a file
       const vkey = JSON.parse(fs.readFileSync(resolve(__dirname, "../../circom/build/circuits/db/verification_key.json")));
 
-      // Verify the proof off-chain
       const isValid = await snarkjs.groth16.verify(vkey, publicSignals, proof);
-      
+
       if (isValid) {
         console.log(chalk.green.bold(`✔ Off-chain proof verified successfully`));
       } else {
@@ -316,7 +368,6 @@ async function main() {
       }
     }
 
-    // Verify the proof on-chain
     if (verificationAnswer.verificationType === 'On Chain') {
       await pauseForUserInput("Press ENTER to verify the proof on-chain...");
 
@@ -330,7 +381,7 @@ async function main() {
       }
 
       const isValidOnChain = await onChainVerification(zkdb, fullRecord);
-      
+
       if (isValidOnChain) {
         console.log(chalk.green.bold(`✔ On-chain proof verified successfully`));
       } else {
@@ -339,7 +390,6 @@ async function main() {
       }
     }
 
-    // Verify the proof with both methods
     if (verificationAnswer.verificationType === 'Both') {
       await pauseForUserInput("Press ENTER to verify the proof on-chain...");
 
@@ -352,7 +402,6 @@ async function main() {
         process.exit(1);
       }
 
-      // Regenerate the proof
       const { proof, publicSignals } = await zkdb.genSignalProof({
         json: fullRecord,
         col_id: 'counterstrike',
@@ -360,14 +409,12 @@ async function main() {
         id: extractGamer(fullRecord),
       });
 
-      // Load the verification key from a file
       const vkey = JSON.parse(fs.readFileSync(resolve(__dirname, "../../circom/build/circuits/db/verification_key.json")));
 
-      // Verify the proof off-chain
       const isValid = await snarkjs.groth16.verify(vkey, publicSignals, proof);
-      
+
       const isValidOnChain = await onChainVerification(zkdb, fullRecord);
-      
+
       if (isValidOnChain && isValid) {
         console.log(chalk.green.bold(`✔ Both Proofs verified successfully`));
       } else {
@@ -376,7 +423,6 @@ async function main() {
       }
     }
 
-    // Print the JSON without the zkProof
     const { _id, zkProof, fingerprint, ...regeneratedJson } = fullRecord;
 
     console.log(chalk.bold(`✔ Regenerated JSON:`));

@@ -1,14 +1,32 @@
 {
   "name": "hardhat-project",
   "devDependencies": {
+    "@matterlabs/hardhat-zksync": "^1.0.0",
+    "@matterlabs/zksync-contracts": "^0.6.1",
+    "@nomicfoundation/hardhat-ignition": "^0.15.5",
+    "@nomicfoundation/hardhat-ignition-ethers": "^0.15.5",
+    "@nomicfoundation/hardhat-network-helpers": "^1.0.11",
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+    "@nomicfoundation/ignition-core": "^0.15.5",
     "@nomiclabs/hardhat-ethers": "^2.2.3",
+    "@nomiclabs/hardhat-etherscan": "^3.1.7",
+    "@openzeppelin/contracts": "^4.6.0",
+    "@openzeppelin/contracts-upgradeable": "4.9.5",
     "@typechain/ethers-v6": "^0.5.1",
-    "ethers": "^5.7.2",
-    "hardhat": "^2.22.4",
+    "@typechain/hardhat": "^9.1.0",
+    "@types/chai": "^4.3.4",
+    "@types/mocha": "^10.0.1",
+    "chai": "^4.4.1",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.13.1",
+    "hardhat": "^2.22.6",
+    "hardhat-gas-reporter": "^1.0.10",
+    "mocha": "^10.2.0",
+    "solidity-coverage": "^0.8.12",
     "ts-node": "^10.9.2",
     "typechain": "^8.3.2",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "zksync-ethers": "^6.7.0"
   },
   "dependencies": {
     "@nomicfoundation/hardhat-network-helpers": "^1.0.10",
@@ -25,7 +43,7 @@
     "hardhat-contract-sizer": "^2.10.0",
     "hardhat-deploy": "^0.12.4",
     "hardhat-gas-reporter": "^2.2.0",
-    "inquirer": "^9.2.23",
+    "inquirer": "^9.3.5",
     "mocha": "^10.2.0",
     "mongodb": "^6.7.0",
     "multiformats": "^13.0.1",
@@ -35,6 +53,7 @@
     "solidity-docgen": "^0.6.0-beta.36",
     "uuid": "^9.0.1",
     "yargs": "^17.7.2",
-    "zkjson": "^0.3.1"
+    "zkjson": "^0.3.1",
+    "zksync-ethers": "^6.10.0"
   }
 }
