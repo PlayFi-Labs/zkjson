@@ -5,3 +5,7 @@ OnChain verification (proof generation process) - 3.928076 seconds
 OnChain verification (verify process) - 0.016514 seconds
 Final insertion in MongoDB - 0.331994 seconds
 Total - 5.123076 seconds
+
+// FingerPrint OnChain
+Fingerprint insertion time: 2.229588 seconds
+Fingerprint check time: 0.262723 seconds

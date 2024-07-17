@@ -28,6 +28,7 @@ const config: HardhatUserConfig = {
   },
   networks: {
     hardhat: {
+      chainId: 1337,
       mining: {
         auto: true,
         interval: [2500, 3000],

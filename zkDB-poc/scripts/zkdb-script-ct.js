@@ -3,12 +3,15 @@ const { DB } = require("../sdk");
 const fs = require('fs');
 const snarkjs = require("snarkjs");
 const crypto = require('crypto');
+const { ethers, JsonRpcProvider } = require('ethers');
+
+const { insertFingerprint, checkFingerprint } = require('./utils/fingerPrint_func');
+
 require("@nomiclabs/hardhat-ethers");
+
+
 require('dotenv').config({ path: resolve(__dirname, '../../.env') });
 require('events').EventEmitter.defaultMaxListeners = 15;
-
-const { ethers } = require("ethers");
-const { Provider } = require("zksync-ethers");
 
 async function main() {
 
@@ -20,12 +23,6 @@ async function main() {
 
   const url = process.env.MONGO_URL;
   const dbName = process.env.MONGO_DB;
-
-  const zkSyncUrl = "https://sepolia.era.zksync.dev";
-  const provider = new Provider(zkSyncUrl);
-  const PRIVATE_KEY = process.env.ZKSYNC_SEPOLIA_PRIVATE_KEY || "";
-  const wallet = new ethers.Wallet(PRIVATE_KEY).connect(provider);
-  const contractAddress = process.env.FINGERPRINT_PROXY_SC;
 
   async function pauseForUserInput(message) {
     await inquirer.prompt([
@@ -49,64 +46,22 @@ async function main() {
     return zkdb;
   }
 
-  async function insertFingerprint(fingerprint) {
-    const functionSignature = "appendData(bytes32)";
-    const functionHash = ethers.keccak256(ethers.toUtf8Bytes(functionSignature)).slice(0, 10);
-    const dataHashPadded = fingerprint.slice(2).padStart(64, "0");
-    const data = functionHash + dataHashPadded;
-
-    try {
-      const tx = await wallet.sendTransaction({
-        to: contractAddress,
-        data: data,
-      });
-      console.log(`Transaction sent: ${tx.hash}`);
-      await tx.wait();
-      console.log("Transaction confirmed");
-    } catch (error) {
-      console.error(`Transaction failed: ${error.message}`);
-      console.error(`Error details: ${JSON.stringify(error, null, 2)}`);
-
-      if (error.data) {
-        try {
-          const reason = ethers.toUtf8String('0x' + error.data.slice(138));
-          console.error(`Revert reason: ${reason}`);
-        } catch (innerError) {
-          console.error(`Failed to decode revert reason: ${innerError.message}`);
-        }
-      }
-    }
-  }
-
-  async function checkFingerprint(fingerprint) {
-    const functionSignatureCheck = "isHashAppended(bytes32)";
-    const functionHashCheck = ethers.keccak256(ethers.toUtf8Bytes(functionSignatureCheck)).slice(0, 10);
-    const dataHashPadded = fingerprint.slice(2).padStart(64, "0");
-    const dataCheck = functionHashCheck + dataHashPadded;
-
-    const result = await provider.call({
-      to: contractAddress,
-      data: dataCheck,
-      from: wallet.address,
-    });
-
-    const isAppended = ethers.AbiCoder.defaultAbiCoder().decode(["bool"], result)[0];
-    return isAppended;
-  }
-
   // On-chain verification
   async function onChainVerification(zkdb, fullRecord) {
 
     const privateKey = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
-    const committer = new ethers.Wallet(privateKey, provider);
-
+    const provider = new JsonRpcProvider('http://127.0.0.1:8545');
+    const committer = new ethers.Wallet(
+      privateKey,
+      provider
+    );
+    const nonce = await provider.getTransactionCount(committer.address, 'latest');
     const VerifierRU = new ethers.ContractFactory(
       require('../artifacts/contracts/verifier_rollup.sol/Groth16VerifierRU.json').abi,
       require('../artifacts/contracts/verifier_rollup.sol/Groth16VerifierRU.json').bytecode,
       committer
     );
-    const verifierRU = await VerifierRU.deploy({ gasLimit: 3000000 });
-    await verifierRU.deployed();
+    const verifierRU = await VerifierRU.deploy({ nonce: nonce, gasLimit: 30000000 });
     console.log(`VerifierRU deployed to: ${verifierRU.address}`);
     
     const VerifierDB = new ethers.ContractFactory(
@@ -114,8 +69,7 @@ async function main() {
         require('../artifacts/contracts/verifier_db.sol/Groth16VerifierDB.json').bytecode,
         committer
     );
-    const verifierDB = await VerifierDB.deploy({ gasLimit: 3000000 });
-    await verifierDB.deployed();
+    const verifierDB = await VerifierDB.deploy({ nonce: nonce, gasLimit: 30000000 });
     console.log(`VerifierDB deployed to: ${verifierDB.address}`);
   
     const MyRU = new ethers.ContractFactory(
@@ -123,11 +77,9 @@ async function main() {
         require('../artifacts/contracts/MyRollup.sol/MyRollup.json').bytecode,
         committer
     );
-    const myru = await MyRU.deploy(verifierRU.address, verifierDB.address, committer.address, { gasLimit: 3000000 });
-    await myru.deployed();
-    console.log(`MyRU deployed to: ${myru.address}`);
-    
-    // Generate the proof
+    const myru = await MyRU.deploy(verifierRU.address, verifierDB.address, committer.address, { nonce: nonce, gasLimit: 30000000 });
+  
+    // Generar la prueba
     const zkp = await zkdb.genProof({
       json: fullRecord,
       col_id: 'counterstrike',
@@ -139,13 +91,13 @@ async function main() {
       // Validate the proof on-chain
       const result = await myru.validateProof(zkp);
       if (!result) {
-        console.error("On-chain verification failed.");
-      }else{
+        console.error("La verificación en cadena falló.");
+      } else {
         return result;
       }
     } catch (error) {
         console.error("On-chain verification failed:", error);
-        return false;
+      return false;
     }
   }
 
