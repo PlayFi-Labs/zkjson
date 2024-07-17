@@ -11,12 +11,29 @@ const PRIVATE_KEY = process.env.ZKSYNC_SEPOLIA_PRIVATE_KEY || "";
 const wallet = new ethers.Wallet(PRIVATE_KEY).connect(provider);
 
 async function insertFingerprint(fingerprint) {
-  const functionSignature = "appendData(bytes32)";
-  const functionHash = ethers.keccak256(ethers.toUtf8Bytes(functionSignature)).slice(0, 10);
+
+  const { default: chalk } = await import('chalk');
+
+  const functionSignatureCheck = "isHashAppended(bytes32)";
+  const functionHashCheck = ethers.keccak256(ethers.toUtf8Bytes(functionSignatureCheck)).slice(0, 10);
   const dataHashPadded = fingerprint.slice(2).padStart(64, "0");
-  const data = functionHash + dataHashPadded;
+  const dataCheck = functionHashCheck + dataHashPadded;
 
   try {
+    const result = await provider.call({
+      to: contractAddress,
+      data: dataCheck,
+      from: wallet.address,
+    });
+    const isAppended = ethers.AbiCoder.defaultAbiCoder().decode(["bool"], result)[0];
+    if (isAppended) {
+      console.log(chalk.red.bold(`Fingerprint Hash already inserted. Operation stopped`));
+      process.exit(0);
+    }
+    const functionSignature = "appendData(bytes32)";
+    const functionHash = ethers.keccak256(ethers.toUtf8Bytes(functionSignature)).slice(0, 10);
+    const data = functionHash + dataHashPadded;
+
     const tx = await wallet.sendTransaction({
       to: contractAddress,
       data: data,
