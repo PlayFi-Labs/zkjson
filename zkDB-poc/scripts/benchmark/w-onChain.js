@@ -3,6 +3,8 @@ const { resolve } = require("path");
 const { DB } = require("../../sdk");
 const fs = require('fs');
 const crypto = require('crypto');
+const { insertFingerprint, checkFingerprint } = require('../../fingerprint/scripts/fingerPrint_func');
+
 require("@nomiclabs/hardhat-ethers");
 
 require('dotenv').config({ path: resolve(__dirname, '../../../.env') });
@@ -88,6 +90,21 @@ async function main() {
   let end = process.hrtime(start);
   let fingerprintTime = end[0] + end[1] / 1e9;
   fs.appendFileSync(reportPath, `Fingerprint creation - ${fingerprintTime.toFixed(6)} seconds\n`, 'utf8');
+
+  let fingerprint = json.fingerprint;
+  // Measure fingerprint creation time On-Chain
+  start = process.hrtime();
+  await insertFingerprint(fingerprint);
+  end = process.hrtime(start);
+  let FingerPrintCreationTime = end[0] + end[1] / 1e9;
+  fs.appendFileSync(reportPath, `FingerPrint insertion OnChain - ${FingerPrintCreationTime.toFixed(6)} seconds\n`, 'utf8');
+
+  // Measure fingerprint check On-Chain
+  start = process.hrtime();
+  await checkFingerprint(fingerprint);  
+  end = process.hrtime(start);
+  let FingerPrintCheckTime = end[0] + end[1] / 1e9;
+  fs.appendFileSync(reportPath, `FingerPrint verification OnChain - ${FingerPrintCheckTime.toFixed(6)} seconds\n`, 'utf8');
 
   // Measure zkdb insertion time
   start = process.hrtime();
