@@ -3,7 +3,7 @@ const { DB } = require("../sdk");
 const fs = require('fs');
 const snarkjs = require("snarkjs");
 const crypto = require('crypto');
-const { insertFingerprint, checkFingerprint } = require('../fingerprint/scripts/fingerPrint_func');
+const { insertFingerprint, checkFingerprint } = require('../fingerPrint/scripts/fingerPrint_func');
 require("@nomiclabs/hardhat-ethers");
 
 require('dotenv').config({ path: resolve(__dirname, '../../.env') });
