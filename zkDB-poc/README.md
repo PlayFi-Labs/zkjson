@@ -48,6 +48,10 @@ yarn compile --power 20 --circuit rollup
 ```bash
 cd zkDB-poc
 npm install
+
+cd zkDB-poc/fingerprint
+npm install
+cd..
 ```
 
 2. Run the Script
