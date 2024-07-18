@@ -3,8 +3,8 @@ const { DB } = require("../sdk");
 const fs = require('fs');
 const snarkjs = require("snarkjs");
 const crypto = require('crypto');
+const { insertFingerprint, checkFingerprint } = require('../fingerPrint/scripts/fingerPrint_func');
 require("@nomiclabs/hardhat-ethers");
-
 
 require('dotenv').config({ path: resolve(__dirname, '../../.env') });
 require('events').EventEmitter.defaultMaxListeners = 15;
@@ -153,6 +153,15 @@ async function main() {
     await pauseForUserInput("Press ENTER to generate and verify the proof...");
 
     await zkdb.insert('counterstrike', json.gamer, json, false);
+    await insertFingerprint(fingerprint);
+    const fingerPrintInserted = await checkFingerprint(fingerprint);
+
+    if (fingerPrintInserted) {
+      console.log(chalk.green.bold(`✔ FingerPrint inserted successfully`));
+    } else {
+      console.log("FingerPrint insert failed");
+      process.exit(1);
+    }
 
     // Generate the proof
     const { proof, publicSignals } = await zkdb.genSignalProof({
@@ -261,10 +270,9 @@ async function main() {
     console.log(chalk.green.bold(`✔ Gamer found in database`));
     console.log(recordForFingerprint);
 
-    // Regenerate the fingerprint
-    const regeneratedFingerprint = createFingerprint(recordForFingerprint);
+    const isAppended = await checkFingerprint(fullRecord.fingerprint);
 
-    if (regeneratedFingerprint !== fullRecord.fingerprint) {
+    if (!isAppended) {
       console.log("Fingerprint does not match.");
       process.exit(1);
     }
