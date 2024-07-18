@@ -32,14 +32,6 @@ To set up, you need to first start a zkSync node using Hardhat, and then deploy 
 npm install
 ```
 
-2. **Run the Script**
-
-Before running the script, you need to specify the address of the FingerPrint Proxy Smart Contract and the Private Key of your Wallet. This is done by setting the value of `FINGERPRINT_PROXY_SC` and `ZKSYNC_SEPOLIA_PRIVATE_KEY` in your `.env` file
-
-```bash
-npx hardhat run scripts/fp_interaction-SC.ts --network
-```
-
 ## Useful Links
 
 - [Official Site](https://www.playfi.ai/)
